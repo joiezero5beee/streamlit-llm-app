@@ -1,14 +1,29 @@
+
 from dotenv import load_dotenv
 load_dotenv()  # カレントの .env を読む
 
 import os
-print(os.getenv("OPENAI_API_KEY") is not None)  # True なら読み込めている
-
 import streamlit as st
-import os
-from langchain.llms import OpenAI
+# ▼ 変更: 旧 from langchain.llms import OpenAI を撤去し、ChatOpenAI を使用
+from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
+
+# ▼ 追加:
+from openai import OpenAI
+
+api_key  = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+base_url = st.secrets.get("OPENAI_BASE_URL") or os.getenv("OPENAI_BASE_URL")  # 使っている場合だけ
+
+if not api_key:
+    st.error("OPENAI_API_KEY が見つかりません")
+    st.stop()
+
+# 辞書を丸ごと渡さず、使う項目だけを明示
+if base_url:
+    client = OpenAI(api_key=api_key, base_url=base_url)
+else:
+    client = OpenAI(api_key=api_key)
 
 # ページ設定
 st.set_page_config(
@@ -48,16 +63,17 @@ def get_recipe_advice(ingredients: str, expert_type: str) -> str:
         str: LLMからの回答
     """
     try:
-        # OpenAI APIキーの確認
-        api_key = os.getenv("OPENAI_API_KEY")
+        # OpenAI APIキーの確認（既に必須コードで検証済みだが念のため）
         if not api_key:
             return "エラー: OpenAI APIキーが設定されていません。環境変数OPENAI_API_KEYを設定してください。"
         
-        # LLMの初期化
-        llm = OpenAI(
-            openai_api_key=api_key,
+        # ▼ 変更: 旧 langchain.llms.OpenAI ではなく ChatOpenAI を利用
+        llm = ChatOpenAI(
+            model="gpt-4o-mini",
             temperature=0.7,
-            max_tokens=1000
+            max_tokens=1000,
+            api_key=api_key,
+            base_url=base_url
         )
         
         # 専門家タイプに応じたシステムプロンプトの設定
